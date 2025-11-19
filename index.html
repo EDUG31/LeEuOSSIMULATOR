@@ -1,0 +1,544 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeEuOS simulator</title>
+    <style>
+        :root {
+            --bg: #1f2937;
+            --panel: #2d3748;
+            --accent: #2563eb;
+            --text: #e6eef8;
+            --muted: #98a0b3;
+            --glass: rgba(255, 255, 255, 0.06);
+            --radius: 14px;
+            --taskbar-h: 56px;
+            --font: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue';
+        }
+
+        :root.light {
+            --bg: #f3f6fb;
+            --panel: #ffffff;
+            --accent: #2563eb;
+            --text: #0b1220;
+            --muted: #475569;
+            --glass: rgba(0, 0, 0, 0.04);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: var(--font);
+            color: var(--text);
+            overflow: hidden;
+            background-image: url("https://images.unsplash.com/photo-1506748686213-dc74ecfbb2f0?crop=entropy&cs=tinysrgb&fit=max&ixid=MnwzNjUyOXwwfDF8c2VhcmNofDJ8fG1vdW50YWlucyUyQyUyMGFuZCUyMHRyZWVzfGVufDB8fHx8fDE2MzExMjkzMzk&ixlib=rb-1.2.1&q=80&fm=jpg&crop=entropy");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed; /* Optional: Keeps the background fixed while scrolling */
+        }
+
+        .app-root {
+            position: relative;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Mica Effect */
+        .mica {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.06));
+            backdrop-filter: none;
+            border-radius: 0;
+        }
+
+        /* Taskbar */
+        .taskbar {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 18px;
+            height: var(--taskbar-h);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px;
+            border-radius: 14px;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 30px rgba(2, 6, 23, 0.6);
+        }
+
+        .taskbar .start-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+        }
+
+        .taskbar .pinned {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            padding: 0 6px;
+        }
+
+        .icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            font-size: 16px;
+        }
+
+        .icon img {
+            width: 20px;
+            height: 20px;
+        }
+
+        .taskbar .tray {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 0 8px;
+            margin-left: 8px;
+        }
+
+        /* Start menu */
+        .start-menu {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 86px;
+            width: 980px;
+            max-width: 95vw;
+            height: 520px;
+            border-radius: 16px;
+            background: var(--panel);
+            box-shadow: 0 20px 60px rgba(2, 6, 23, 0.6);
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transition: all .2s ease;
+        }
+
+        .start-menu.open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(6px);
+        }
+
+        .start-left {
+            padding: 18px;
+            border-right: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .app-tile {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* App Store */
+        .app-store {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 80px;
+            width: 80%;
+            height: 80vh;
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 12px;
+            box-shadow: 0 20px 60px rgba(2, 6, 23, 0.6);
+            display: none;
+            overflow-y: auto;
+        }
+
+        .app-store.open {
+            display: block;
+        }
+
+        .app-store h2 {
+            margin-bottom: 20px;
+        }
+
+        .app-store .app-list {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .app-store .app-item {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        /* Windows */
+        .window {
+            position: absolute;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.06));
+            border-radius: 12px;
+            box-shadow: 0 8px 40px rgba(2, 6, 23, 0.6);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            width: 640px;
+            height: 380px;
+            left: calc(50% - 320px);
+            top: 80px;
+            cursor: grab;
+        }
+
+        .titlebar {
+            height: 42px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 10px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(0, 0, 0, 0.02));
+            cursor: grab;
+        }
+
+        .titlebar .controls {
+            margin-left: auto;
+            display: flex;
+            gap: 6px;
+        }
+
+        .win-content {
+            padding: 12px;
+            height: calc(100% - 42px);
+            overflow: auto;
+        }
+
+        /* Accessibility helpers */
+        .high-contrast {
+            filter: contrast(1.2) saturate(1.1);
+        }
+
+        /* Responsive */
+        @media (max-width: 720px) {
+            .start-menu {
+                width: 95vw;
+                height: 70vh;
+                left: 50%;
+                bottom: 76px;
+            }
+
+            .taskbar {
+                width: calc(100% - 36px);
+                left: 18px;
+                transform: none;
+                border-radius: 12px;
+            }
+        }
+  
+body {
+    background-color: black;
+}
+
+    </style>
+</head>
+<body>
+    <div class="app-root">
+        <div class="mica"></div>
+
+        <!-- Taskbar -->
+        <div class="taskbar" id="taskbar">
+            <button class="start-btn" id="startBtn">
+                <span>LeEu</span>
+            </button>
+            <div class="pinned" id="pinnedBar"></div>
+            <div class="tray">
+                <div id="timeBox"></div>
+                <button id="notifBtn">🔔</button>
+                <button id="quickBtn">⚙️</button>
+            </div>
+        </div>
+
+        <!-- Start Menu -->
+        <div id="start" class="start-menu">
+            <div class="start-left">
+                <div><h3>Apps</h3></div>
+                <div class="app-grid" id="pinnedApps"></div>
+            </div>
+        </div>
+
+        <!-- App Store -->
+        <div id="appStore" class="app-store">
+            <h2>App Store</h2>
+            <div class="app-list" id="appList"></div>
+        </div>
+
+        <!-- Quick Settings -->
+        <div id="quick" class="quick-panel">
+            <h3>Quick Settings</h3>
+            <div>
+                <button id="darkToggle">Toggle Dark Theme</button>
+                <button id="dndToggle">Do Not Disturb</button>
+            </div>
+        </div>
+
+        <!-- Widgets -->
+        <div id="widgetsBoard" class="widgets-board">
+            <div>
+                <button id="closeWidgets">Close Widgets</button>
+            </div>
+        </div>
+
+        <!-- Windows -->
+        <div id="windows"></div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById("startBtn");
+        const startMenu = document.getElementById("start");
+        const pinnedApps = document.getElementById("pinnedApps");
+        const timeBox = document.getElementById("timeBox");
+        const notifBtn = document.getElementById("notifBtn");
+        const quickBtn = document.getElementById("quickBtn");
+        const notifPanel = document.getElementById("quick");
+        const appStore = document.getElementById("appStore");
+        const appList = document.getElementById("appList");
+        const darkToggle = document.getElementById("darkToggle");
+
+        // Update time
+        function updateTime() {
+            const d = new Date();
+            timeBox.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Taskbar and Start Menu interaction
+        startBtn.addEventListener("click", () => {
+            startMenu.classList.toggle("open");
+        });
+
+        // Open App Store
+        startMenu.addEventListener("dblclick", () => {
+            appStore.classList.add("open");
+            startMenu.classList.remove("open");
+        });
+
+        // Populate the App Store with more apps
+        const apps = [
+            { id: "explorer", name: "File Explorer", icon: "📁" },
+            { id: "browser", name: "Browser", icon: "🌐" },
+            { id: "calculator", name: "Calculator", icon: "🔢" },
+            { id: "terminal", name: "Terminal", icon: "💻" },
+            { id: "notepad", name: "Notepad", icon: "📝" }
+        ];
+
+        apps.forEach(app => {
+            const appItem = document.createElement("div");
+            appItem.className = "app-item";
+            appItem.innerHTML = `${app.icon} ${app.name}`;
+            appItem.addEventListener("click", () => {
+                openAppWindow(app.id, app.name);
+                appStore.classList.remove("open");
+            });
+            appList.appendChild(appItem);
+        });
+
+        // Quick settings panel
+        notifBtn.addEventListener("click", () => {
+            notifPanel.style.display = notifPanel.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Sample pinned apps and opening apps
+        const pinnedItems = apps.map(app => {
+            const icon = document.createElement("div");
+            icon.className = "icon";
+            icon.innerHTML = app.icon;
+            icon.title = app.name;
+            pinnedApps.appendChild(icon);
+            icon.addEventListener("click", () => {
+                openAppWindow(app.id, app.name);
+            });
+        });
+
+        // Create app window with drag functionality
+        function openAppWindow(id, title) {
+            const win = document.createElement("div");
+            win.className = "window";
+            win.innerHTML = `<div class="titlebar"><strong>${title}</strong><div class="controls"><button class="min">_</button><button class="max">◻</button><button class="close">✕</button></div></div>`;
+            
+            // If it's the browser, load Google
+            if (id === "browser") {
+                win.innerHTML += `<div class="win-content"><iframe src="https://www.google.com" width="100%" height="100%"></iframe></div>`;
+            } else if (id === "calculator") {
+                win.innerHTML += `<div class="win-content">
+                                    <input type="text" id="calcInput" disabled placeholder="0" />
+                                    <div id="calcButtons">
+                                        <button onclick="appendToCalc('1')">1</button>
+                                        <button onclick="appendToCalc('2')">2</button>
+                                        <button onclick="appendToCalc('3')">3</button>
+                                        <button onclick="appendToCalc('4')">4</button>
+                                        <button onclick="appendToCalc('5')">5</button>
+                                        <button onclick="appendToCalc('6')">6</button>
+                                        <button onclick="appendToCalc('7')">7</button>
+                                        <button onclick="appendToCalc('8')">8</button>
+                                        <button onclick="appendToCalc('9')">9</button>
+                                        <button onclick="appendToCalc('0')">0</button>
+                                        <button onclick="appendToCalc('+')">+</button>
+                                        <button onclick="appendToCalc('-')">-</button>
+                                        <button onclick="appendToCalc('*')">*</button>
+                                        <button onclick="appendToCalc('/')">/</button>
+                                        <button onclick="calculate()">=</button>
+                                        <button onclick="clearCalc()">C</button>
+                                    </div>
+                                  </div>`;
+            } else if (id === "terminal") {
+                win.innerHTML += `<div class="win-content">
+                                    <textarea id="terminalOutput" rows="10" placeholder="Type your commands..."></textarea>
+                                    <button onclick="runCommand()">Run Command</button>
+                                  </div>`;
+            } else if (id === "notepad") {
+                win.innerHTML += `<div class="win-content">
+                                    <textarea id="notepadText" placeholder="Write your notes..."></textarea>
+                                    <button onclick="saveNotepad()">Save</button>
+                                    <button onclick="clearNotepad()">Clear</button>
+                                  </div>`;
+            } else {
+                win.innerHTML += `<div class="win-content">${title} content...</div>`;
+            }
+
+            document.body.appendChild(win);
+
+            // Make window draggable
+            let isDragging = false;
+            let offsetX, offsetY;
+
+            const titlebar = win.querySelector(".titlebar");
+
+            titlebar.addEventListener("mousedown", (e) => {
+                isDragging = true;
+                offsetX = e.clientX - win.getBoundingClientRect().left;
+                offsetY = e.clientY - win.getBoundingClientRect().top;
+                titlebar.style.cursor = "move";
+            });
+
+            window.addEventListener("mousemove", (e) => {
+                if (isDragging) {
+                    win.style.left = `${e.clientX - offsetX}px`;
+                    win.style.top = `${e.clientY - offsetY}px`;
+                }
+            });
+
+            window.addEventListener("mouseup", () => {
+                isDragging = false;
+                titlebar.style.cursor = "grab";
+            });
+
+            // Window Controls
+            const closeBtn = win.querySelector(".close");
+            const minBtn = win.querySelector(".min");
+            const maxBtn = win.querySelector(".max");
+
+            // Close button functionality
+            closeBtn.addEventListener("click", () => {
+                win.remove();
+            });
+
+            // Minimize functionality
+            minBtn.addEventListener("click", () => {
+                win.style.display = "none";
+            });
+
+            // Maximize/Restore functionality
+            maxBtn.addEventListener("click", () => {
+                if (win.style.width === "100%") {
+                    win.style.width = "640px";
+                    win.style.height = "380px";
+                } else {
+                    win.style.width = "100%";
+                    win.style.height = "100%";
+                }
+            });
+        }
+
+        // Calculator Functions
+        function appendToCalc(value) {
+            const calcInput = document.getElementById('calcInput');
+            if (calcInput.value === '0') {
+                calcInput.value = value;
+            } else {
+                calcInput.value += value;
+            }
+        }
+
+        function clearCalc() {
+            document.getElementById('calcInput').value = '0';
+        }
+
+        function calculate() {
+            const calcInput = document.getElementById('calcInput');
+            calcInput.value = eval(calcInput.value);
+        }
+
+        // Terminal Functionality
+        function runCommand() {
+            const output = document.getElementById('terminalOutput');
+            output.value += "\nRunning command...";
+        }
+
+        // Notepad Functions
+        function saveNotepad() {
+            const text = document.getElementById('notepadText').value;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'notepad.txt';
+            link.click();
+        }
+
+        function clearNotepad() {
+            document.getElementById('notepadText').value = '';
+        }
+
+        // Toggle Dark/Light theme
+        darkToggle.addEventListener("click", () => {
+            document.documentElement.classList.toggle("light");
+        });
+
+        // Open Start Menu with Cmd or Win key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Meta' || e.key === 'Control') {
+                startMenu.classList.toggle("open");
+            }
+        });
+    </script>
+    <footer>
+        <p>© 2025 <strong>LeEu</strong>. All rights reserved.</p>
+    </footer>
+    
+</body>
+</html>
